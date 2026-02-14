@@ -7,12 +7,10 @@ module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // OPTIONS request handling (preflight)
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
-    // GET request only
     if (req.method !== 'GET') {
         return res.status(405).json({ 
             success: false, 
@@ -21,109 +19,202 @@ module.exports = async (req, res) => {
     }
 
     try {
-        // Query parameters ගැනීම
         const searchTerm = req.query.q || 'accounting';
-        const pages = parseInt(req.query.pages) || 1;
-        
-        // Validate pages
-        if (pages > 5) {
-            return res.status(400).json({
-                success: false,
-                error: 'පිටු 5කට වඩා ස්ක්‍රැප් කරන්න අවසර නැහැ.'
-            });
-        }
+        const pages = Math.min(parseInt(req.query.pages) || 1, 5);
 
         const baseUrl = 'https://www.alevelapi.com';
-        const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        };
+        
+        // Different User-Agents try කරන්න
+        const userAgents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ];
 
         let allResults = [];
-        let resultCount = 0;
+        let debugInfo = [];
 
-        // Loop through pages
         for (let page = 1; page <= pages; page++) {
             const url = page === 1 
                 ? `${baseUrl}/?s=${encodeURIComponent(searchTerm)}`
                 : `${baseUrl}/page/${page}/?s=${encodeURIComponent(searchTerm)}`;
 
-            console.log(`📥 පිටුව ${page} ස්ක්‍රැප් කරනවා...`);
+            console.log(`📥 Trying: ${url}`);
 
             try {
+                // Random User-Agent එකක් use කරමු
+                const headers = {
+                    'User-Agent': userAgents[Math.floor(Math.random() * userAgents.length)],
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1'
+                };
+
                 const response = await axios.get(url, { 
                     headers, 
-                    timeout: 8000 
+                    timeout: 10000,
+                    maxRedirects: 5
                 });
                 
                 const $ = cheerio.load(response.data);
+                
+                // Debug: පිටුවේ HTML structure එක check කරමු
+                debugInfo.push({
+                    page,
+                    url,
+                    title: $('title').text(),
+                    hasPostItems: $('li.post-item').length > 0,
+                    hasArticles: $('article').length > 0,
+                    hasEntries: $('.entry-title').length > 0
+                });
 
-                // සෙවුම් ප්‍රතිඵල සොයා ගැනීම
-                const postItems = $('li.post-item');
+                // විවිධ selectors try කරමු
+                const possibleSelectors = [
+                    'li.post-item',
+                    'article',
+                    '.post-item',
+                    '.post',
+                    '.hentry',
+                    '.type-post',
+                    '.type-page',
+                    '.post-grid',
+                    '.post-list'
+                ];
 
-                if (postItems.length === 0) {
-                    console.log('✅ තවත් ප්‍රතිඵල නැහැ.');
-                    break;
+                let postItems = null;
+                let usedSelector = '';
+
+                for (const selector of possibleSelectors) {
+                    const items = $(selector);
+                    if (items.length > 0) {
+                        postItems = items;
+                        usedSelector = selector;
+                        console.log(`✅ Selector "${selector}" වැඩ කරයි - items ${items.length}`);
+                        break;
+                    }
+                }
+
+                if (!postItems || postItems.length === 0) {
+                    console.log('⚠️ කිසිම selector එකක් වැඩ කළේ නැහැ');
+                    
+                    // Save HTML for debugging (optional)
+                    debugInfo.push({
+                        htmlSample: response.data.substring(0, 500)
+                    });
+                    continue;
                 }
 
                 postItems.each((index, item) => {
                     try {
-                        const article = $(item).find('article');
+                        const $item = $(item);
                         
-                        // සිරස්තලය (Title)
-                        const titleElem = article.find('h2.entry-title a');
-                        const title = titleElem.text().trim() || 'N/A';
-                        const link = titleElem.attr('href') || '#';
-                        
-                        // කාණ්ඩය (Category)
-                        const catElem = article.find('.bb-cat-links a');
-                        const category = catElem.text().trim() || 'N/A';
-                        
-                        // පින්තූරය (Thumbnail)
-                        const imgElem = article.find('img.wp-post-image');
-                        const thumbnail = imgElem.attr('src') || null;
-                        
-                        // ප්‍රතිඵල වර්ගය (Post Type)
-                        const postType = article.hasClass('page') ? 'page' : 'post';
-                        
-                        // Description/Meta
-                        const metaElem = article.find('.entry-sub-title, .post-excerpt');
-                        const description = metaElem.text().trim() || null;
+                        // Multiple title selector patterns
+                        const titleSelectors = [
+                            'h2.entry-title a',
+                            'h2.entry-title',
+                            '.entry-title a',
+                            '.entry-title',
+                            'h3 a',
+                            'h2 a',
+                            'a[rel="bookmark"]'
+                        ];
 
-                        resultCount++;
+                        let title = 'N/A';
+                        let link = '#';
                         
-                        allResults.push({
-                            id: resultCount,
-                            title: title,
-                            link: link.startsWith('http') ? link : baseUrl + link,
-                            category: category,
-                            thumbnail: thumbnail,
-                            type: postType,
-                            description: description
-                        });
+                        for (const sel of titleSelectors) {
+                            const elem = $item.find(sel);
+                            if (elem.length > 0) {
+                                title = elem.text().trim();
+                                link = elem.attr('href') || link;
+                                if (link && !link.startsWith('http')) {
+                                    link = baseUrl + link;
+                                }
+                                break;
+                            }
+                        }
+
+                        // Category selectors
+                        const categorySelectors = [
+                            '.bb-cat-links a',
+                            '.cat-links a',
+                            '.post-categories a',
+                            '.category a',
+                            '.post-meta a'
+                        ];
+
+                        let category = 'N/A';
+                        for (const sel of categorySelectors) {
+                            const cat = $item.find(sel).first();
+                            if (cat.length > 0) {
+                                category = cat.text().trim();
+                                break;
+                            }
+                        }
+
+                        // Thumbnail
+                        const thumbSelectors = [
+                            'img.wp-post-image',
+                            'img.attachment-thumbnail',
+                            '.post-thumbnail img',
+                            'img[src*="uploads"]'
+                        ];
+
+                        let thumbnail = null;
+                        for (const sel of thumbSelectors) {
+                            const img = $item.find(sel).first();
+                            if (img.length > 0) {
+                                thumbnail = img.attr('src') || img.attr('data-src') || null;
+                                if (thumbnail && !thumbnail.startsWith('http')) {
+                                    thumbnail = baseUrl + thumbnail;
+                                }
+                                break;
+                            }
+                        }
+
+                        if (title !== 'N/A') {
+                            allResults.push({
+                                id: allResults.length + 1,
+                                title: title,
+                                link: link,
+                                category: category,
+                                thumbnail: thumbnail,
+                                type: $item.hasClass('page') ? 'page' : 'post'
+                            });
+                        }
 
                     } catch (parseError) {
-                        console.error('⚠️ ප්‍රතිඵලයක් parse කිරීමේදී දෝෂයක්:', parseError.message);
+                        console.error('Parse error:', parseError.message);
                     }
                 });
 
             } catch (pageError) {
-                console.error(`❌ පිටුව ${page} ස්ක්‍රැප් කිරීමේදී දෝෂයක්:`, pageError.message);
-                // Continue with next page
+                console.error(`❌ Error on page ${page}:`, pageError.message);
+                debugInfo.push({
+                    page,
+                    error: pageError.message,
+                    status: pageError.response?.status,
+                    statusText: pageError.response?.statusText
+                });
             }
         }
 
-        // ප්‍රතිඵල return කිරීම
+        // Return results with debug info
         return res.status(200).json({
             success: true,
             search_term: searchTerm,
             pages_scraped: pages,
             total_results: allResults.length,
             data: allResults,
+            debug: debugInfo, // මේක temporary, පස්සේ ඉවත් කරන්න
             timestamp: new Date().toISOString()
         });
 
     } catch (error) {
-        console.error('❌ ස්ක්‍රැපර් දෝෂය:', error);
+        console.error('❌ Scraper error:', error);
         
         return res.status(500).json({
             success: false,
