@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlevelApi Scraper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 2.5em;
+        }
+        h1 span {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .search-box {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        select {
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+        }
+        button {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .results {
+            margin-top: 30px;
+        }
+        .result-item {
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .result-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .result-title {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        .result-title a {
+            color: #333;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .result-title a:hover {
+            color: #667eea;
+        }
+        .result-meta {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .badge {
+            background: #667eea;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .stats {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📚 <span>AlevelApi</span> Scraper</h1>
+        
+        <div class="search-box">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="සෙවීමට අවශ්‍ය පදය (උදා: accounting, physics, biology)"
+                    value="accounting"
+                >
+                <select id="pagesSelect">
+                    <option value="1">පිටු 1</option>
+                    <option value="2">පිටු 2</option>
+                    <option value="3">පිටු 3</option>
+                    <option value="4">පිටු 4</option>
+                    <option value="5">පිටු 5</option>
+                </select>
+                <button id="searchBtn" onclick="search()">
+                    <span>🔍</span> සොයන්න
+                </button>
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>දත්ත ලබා ගනිමින්...</p>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="stats" class="stats" style="display: none;"></div>
+
+        <div id="results" class="results"></div>
+
+        <div class="footer">
+            <p>Made with ❤️ for A/L Students in Sri Lanka</p>
+        </div>
+    </div>
+
+    <script>
+        // Vercel API URL (ඔයාගේ Vercel URL එක මෙතන දාන්න)
+        const API_URL = '/api/search'; // or 'https://your-app.vercel.app/api/search'
+
+        async function search() {
+            const searchTerm = document.getElementById('searchInput').value.trim();
+            const pages = document.getElementById('pagesSelect').value;
+            const resultsDiv = document.getElementById('results');
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            const statsDiv = document.getElementById('stats');
+            const searchBtn = document.getElementById('searchBtn');
+
+            if (!searchTerm) {
+                alert('කරුණාකර සෙවුම් පදයක් ඇතුළත් කරන්න.');
+                return;
+            }
+
+            // UI update
+            resultsDiv.innerHTML = '';
+            errorDiv.style.display = 'none';
+            statsDiv.style.display = 'none';
+            loadingDiv.style.display = 'block';
+            searchBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_URL}?q=${encodeURIComponent(searchTerm)}&pages=${pages}`);
+                const data = await response.json();
+
+                loadingDiv.style.display = 'none';
+                searchBtn.disabled = false;
+
+                if (!data.success) {
+                    errorDiv.textContent = data.error || 'දෝෂයක් සිදු විය.';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                // Stats පෙන්වන්න
+                statsDiv.innerHTML = `
+                    <strong>📊 ප්‍රතිඵල තොරතුරු</strong><br>
+                    සෙවුම් පදය: "${data.search_term}" | 
+                    පිටු: ${data.pages_scraped} | 
