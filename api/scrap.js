@@ -1,14 +1,25 @@
-import axios from "axios";
-import cheerio from "cheerio";
+const axios = require("axios");
+const cheerio = require("cheerio");
 
+// ================================================
+// CONFIG
+// ================================================
 const SCRAPER_KEY = "1dc33de41f93eaf98bbb3b6dcae2da65";
 const BASE = "https://www.alevelapi.com";
 
-const proxyUrl = (url) => {
-  return "http://api.scraperapi.com?api_key=" + SCRAPER_KEY + "&url=" + encodeURIComponent(url);
-};
+function proxyUrl(targetUrl) {
+  return (
+    "http://api.scraperapi.com?api_key=" +
+    SCRAPER_KEY +
+    "&url=" +
+    encodeURIComponent(targetUrl)
+  );
+}
 
-const searchPapers = async (searchTerm) => {
+// ================================================
+// SEARCH PAPERS
+// ================================================
+async function searchPapers(searchTerm) {
   const targetUrl = BASE + "/?s=" + encodeURIComponent(searchTerm);
 
   const res = await axios.get(proxyUrl(targetUrl), { timeout: 30000 });
@@ -16,8 +27,9 @@ const searchPapers = async (searchTerm) => {
 
   const papers = [];
 
-  $("article").each((i, el) => {
+  $("article").each(function (i, el) {
     const titleEl = $(el).find("h2 a, h3 a, .entry-title a").first();
+
     const paperTitle = titleEl.text().trim();
     const paperLink = titleEl.attr("href") || "";
 
@@ -25,10 +37,6 @@ const searchPapers = async (searchTerm) => {
 
     const yearMatch = paperTitle.match(/20\d{2}/);
     const year = yearMatch ? yearMatch[0] : "N/A";
-
-    let part = "N/A";
-    const partMatch = paperTitle.match(/part\s*i{1,3}/i);
-    if (partMatch) part = partMatch[0];
 
     let medium = "N/A";
     if (/sinhala/i.test(paperTitle)) medium = "Sinhala";
@@ -38,72 +46,80 @@ const searchPapers = async (searchTerm) => {
     papers.push({
       title: paperTitle,
       link: paperLink,
-      year,
-      part,
-      medium
+      year: year,
+      medium: medium
     });
   });
 
   return papers;
-};
+}
 
-const getPdfLink = async (paperLink) => {
-  const res = await axios.get(proxyUrl(paperLink), { timeout: 30000 });
+// ================================================
+// GET PDF LINK
+// ================================================
+async function getPdfLink(pageUrl) {
+  const res = await axios.get(proxyUrl(pageUrl), { timeout: 30000 });
   const $ = cheerio.load(res.data);
 
   let pdfUrl = null;
 
-  $("a").each((i, el) => {
+  $("a").each(function (i, el) {
     const href = $(el).attr("href") || "";
-    if (!pdfUrl && (href.includes(".pdf") || href.includes("wp-content/uploads"))) {
+
+    if (!pdfUrl && href.toLowerCase().includes(".pdf")) {
       pdfUrl = href;
     }
   });
 
-  if (!pdfUrl) {
-    $("iframe, embed, object").each((i, el) => {
-      const src = $(el).attr("src") || $(el).attr("data") || "";
-      if (!pdfUrl && src.includes(".pdf")) pdfUrl = src;
-    });
-  }
-
   return pdfUrl;
-};
+}
 
-export default async function handler(req, res) {
+// ================================================
+// VERCEL API HANDLER
+// ================================================
+module.exports = async (req, res) => {
   try {
     const { search, pdf } = req.query;
 
     // SEARCH API
     if (search) {
-      const papers = await searchPapers(search);
+      const results = await searchPapers(search);
 
-      return res.status(200).json({
+      return res.json({
         status: true,
-        total: papers.length,
-        results: papers
+        creator: "Chathura Hansaka",
+        query: search,
+        total: results.length,
+        results: results
       });
     }
 
-    // PDF API
+    // PDF LINK API
     if (pdf) {
-      const pdfUrl = await getPdfLink(pdf);
+      const pdfLink = await getPdfLink(pdf);
 
-      return res.status(200).json({
+      return res.json({
         status: true,
-        pdf: pdfUrl
+        creator: "Chathura Hansaka",
+        pdf: pdfLink
       });
     }
 
-    return res.status(400).json({
-      status: false,
-      message: "Use ?search=term or ?pdf=paperlink"
+    // DEFAULT
+    res.json({
+      status: true,
+      creator: "Chathura Hansaka",
+      message: "A/L Papers API",
+      usage: {
+        search: "/api/scrap?search=ict",
+        pdf: "/api/scrap?pdf=<paper_page_url>"
+      }
     });
-
   } catch (err) {
-    return res.status(500).json({
+    res.status(500).json({
       status: false,
+      creator: "Chathura Hansaka",
       error: err.message
     });
   }
-}
+};
