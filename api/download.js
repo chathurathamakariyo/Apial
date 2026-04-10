@@ -1,17 +1,20 @@
 import fetch from "node-fetch";
 
 export default async function handler(req, res) {
-  const { url } = req.query;
+  const { data } = req.query;
 
-  if (!url) {
-    return res.status(400).send("No URL provided");
+  if (!data) {
+    return res.status(400).send("Invalid link");
   }
 
   try {
+    // 🔥 decode original URL
+    const url = Buffer.from(data, "base64").toString("utf-8");
+
     const response = await fetch(url, {
       headers: {
-        "Referer": "https://cinesubz.lk/",
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://cinesubz.lk/"
       }
     });
 
@@ -19,7 +22,6 @@ export default async function handler(req, res) {
       return res.status(500).send("Failed to fetch file");
     }
 
-    // 🔥 Force download
     res.setHeader(
       "Content-Disposition",
       'attachment; filename="download.mp4"'
@@ -30,7 +32,6 @@ export default async function handler(req, res) {
       response.headers.get("content-type") || "application/octet-stream"
     );
 
-    // stream file to user
     response.body.pipe(res);
 
   } catch (err) {
