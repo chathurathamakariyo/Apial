@@ -19,24 +19,18 @@ export default async function handler(req, res) {
       return res.status(500).send("Failed to fetch file");
     }
 
-    // 🔥 IMPORTANT HEADERS (this fixes size issue)
-    const contentLength = response.headers.get("content-length");
-    const contentType = response.headers.get("content-type");
-
-    if (contentLength) {
-      res.setHeader("Content-Length", contentLength);
-    }
-
-    if (contentType) {
-      res.setHeader("Content-Type", contentType);
-    }
-
+    // 🔥 Force download
     res.setHeader(
       "Content-Disposition",
       'attachment; filename="download.mp4"'
     );
 
-    // 🔥 stream with headers preserved
+    res.setHeader(
+      "Content-Type",
+      response.headers.get("content-type") || "application/octet-stream"
+    );
+
+    // stream file to user
     response.body.pipe(res);
 
   } catch (err) {
