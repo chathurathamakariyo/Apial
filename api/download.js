@@ -3,29 +3,43 @@ import fetch from "node-fetch";
 export default async function handler(req, res) {
   const { url } = req.query;
 
-  if (!url) return res.status(400).send("No URL");
+  if (!url) {
+    return res.status(400).send("No URL provided");
+  }
 
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0",
-      "Referer": "https://cinesubz.lk/"
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "Referer": "https://cinesubz.lk/",
+        "User-Agent": "Mozilla/5.0"
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(500).send("Failed to fetch file");
     }
-  });
 
-  if (!response.ok) return res.status(500).send("Failed");
+    // 🔥 IMPORTANT HEADERS (this fixes size issue)
+    const contentLength = response.headers.get("content-length");
+    const contentType = response.headers.get("content-type");
 
-  const total = response.headers.get("content-length");
+    if (contentLength) {
+      res.setHeader("Content-Length", contentLength);
+    }
 
-  let rawName = decodeURIComponent(url.split("/").pop().split("?")[0]);
-  const fileName = `[Chdev]${rawName}`;
+    if (contentType) {
+      res.setHeader("Content-Type", contentType);
+    }
 
-  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-  res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="download.mp4"'
+    );
 
-  // 🔥 IMPORTANT: force expose header
-  res.setHeader("Access-Control-Expose-Headers", "X-Total-Size");
+    // 🔥 stream with headers preserved
+    response.body.pipe(res);
 
-  res.setHeader("X-Total-Size", total || 0);
-
-  response.body.pipe(res);
+  } catch (err) {
+    res.status(500).send("Server error");
+  }
 }
