@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Stream → Download</title>
+  <title>Stream → Short Download Link</title>
 </head>
 <body style="text-align:center;font-family:Arial;background:#111;color:white;padding:40px;">
 
 <h2>Stream Link Converter</h2>
 
-<input id="url" style="width:80%;padding:10px;" placeholder="Paste stream link" />
+<input id="url" style="width:80%;padding:10px;" placeholder="Paste stream link here" />
 <br><br>
 
-<button onclick="go()">Generate Download Link</button>
+<button onclick="go()">Generate Short Link</button>
 
 <p id="out"></p>
 
@@ -18,11 +18,20 @@
 async function go() {
   const url = document.getElementById("url").value;
 
+  if (!url) return alert("Paste a link");
+
   const res = await fetch(`/api/convert?url=${encodeURIComponent(url)}`);
   const data = await res.json();
 
+  if (!data.link) {
+    document.getElementById("out").innerHTML = "Error generating link";
+    return;
+  }
+
   document.getElementById("out").innerHTML =
-    `<a style="color:lime" href="${data.link}">⬇ Download File</a>`;
+    `✅ <a style="color:lime;font-size:18px" target="_blank" href="${data.link}">
+      ⬇ Open Download Link
+    </a>`;
 }
 </script>
 
