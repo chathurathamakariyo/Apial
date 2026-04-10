@@ -1,17 +1,8 @@
 {
-  "name": "alevel-papers-api",
+  "name": "stream-downloader",
   "version": "1.0.0",
-  "description": "A/L Papers Scraper API for alevelapi.com",
-  "main": "api/scrap.js",
   "type": "module",
-  "scripts": {
-    "start": "node api/scrap.js",
-    "dev": "vercel dev"
-  },
   "dependencies": {
-    "axios": "^1.6.2",
-    "cheerio": "^1.0.0-rc.12"
-  },
-  "author": "Chathura Hansaka",
-  "license": "MIT"
+    "node-fetch": "^3.3.2"
+  }
 }
