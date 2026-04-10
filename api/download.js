@@ -1,133 +1,127 @@
 import fetch from "node-fetch";
 
+const SCRAPER_API = "https://karicine.netlify.app/.netlify/functions/scrapper";
+const SOURCE_DOMAIN = "https://csplayer2510.store/";
+const TARGET_DOMAIN = "https://06.sume321.online/";
+const CREATOR = "Chathura Hansaka";
+
+// Quality suffix map
+const QUALITY_MAP = {
+  "480p": "480p.mp4",
+  "720p": "720p.mp4",
+  "1080p": "1080p.mp4",
+};
+
+// Extract base path from a video URL (remove quality+ext suffix)
+function getBasePath(url) {
+  // Replace source domain with target domain
+  let path = url.replace(SOURCE_DOMAIN, "");
+
+  // Remove any quality suffix like 720p.mp4, 480p.mp4, 1080p.mp4, 1080.mp4
+  // Pattern: remove trailing -quality.mp4 or quality.mp4 or .mp4
+  path = path.replace(/[-_]?(1080p?|720p|480p)?\.mp4$/i, "");
+
+  // Remove trailing dash/space
+  path = path.replace(/[-\s]+$/, "");
+
+  return path;
+}
+
 export default async function handler(req, res) {
   const { url, quality } = req.query;
 
   if (!url) {
     return res.status(400).json({
-      error: "Movie URL is required"
+      error: "No URL provided",
+      usage: "/api/download?url=<cinesubz-page-url>&quality=480p|720p|1080p",
+      creator: CREATOR,
     });
   }
 
+  // If quality is provided, just stream/redirect the file
+  if (quality) {
+    // quality mode: url here should already be a direct video URL or base path
+    const suffix = QUALITY_MAP[quality];
+    if (!suffix) {
+      return res.status(400).json({ error: "Invalid quality. Use 480p, 720p, or 1080p" });
+    }
+
+    // Reconstruct full URL
+    const videoUrl = `${TARGET_DOMAIN}${url}${suffix}`;
+    return streamFile(videoUrl, `movie-${quality}.mp4`, res);
+  }
+
+  // Step 1: Scrape the CineSubz page
+  let scraped;
   try {
-    // =========================
-    // 1. CALL SCRAPER API
-    // =========================
-    const scraperRes = await fetch(
-      `https://karicine.netlify.app/.netlify/functions/scrapper?url=${encodeURIComponent(url)}`
-    );
-
-    const data = await scraperRes.json();
-
-    if (!data || !data.links || !data.links.manual) {
-      return res.status(500).json({
-        error: "Scraper failed or invalid response"
-      });
+    const scraperRes = await fetch(`${SCRAPER_API}?url=${encodeURIComponent(url)}`);
+    if (!scraperRes.ok) {
+      return res.status(502).json({ error: "Scraper API failed", status: scraperRes.status });
     }
-
-    // =========================
-    // 2. GET MANUAL LINK
-    // =========================
-    let baseLink = data.links.manual;
-
-    // =========================
-    // 3. DOMAIN REPLACE
-    // =========================
-    baseLink = baseLink.replace(
-      "csplayer2510.store",
-      "06.sume321.online"
-    );
-
-    // =========================
-    // 4. QUALITY GENERATOR
-    // =========================
-    function getQualityLink(q) {
-      return baseLink.replace(
-        /-(480p|720p|1080p)\.mp4/,
-        `-${q}.mp4`
-      );
-    }
-
-    const links = {
-      "480p": getQualityLink("480p"),
-      "720p": getQualityLink("720p"),
-      "1080p": getQualityLink("1080p")
-    };
-
-    // =========================
-    // 5. IF QUALITY REQUESTED → PROXY DOWNLOAD
-    // =========================
-    if (quality) {
-      const fileUrl = links[quality];
-
-      if (!fileUrl) {
-        return res.status(400).json({
-          error: "Invalid quality. Use 480p, 720p, 1080p"
-        });
-      }
-
-      // 🔥 FETCH FILE WITH HEADERS
-      const fileRes = await fetch(fileUrl, {
-        headers: {
-          "Referer": "https://cinesubz.net/",
-          "User-Agent": "Mozilla/5.0",
-          "Accept": "*/*"
-        }
-      });
-
-      if (!fileRes.ok) {
-        return res.status(500).json({
-          error: "Failed to fetch video file"
-        });
-      }
-
-      // =========================
-      // 6. FORCE DOWNLOAD HEADERS
-      // =========================
-      const contentType = fileRes.headers.get("content-type");
-      const contentLength = fileRes.headers.get("content-length");
-
-      if (contentType) {
-        res.setHeader("Content-Type", contentType);
-      } else {
-        res.setHeader("Content-Type", "application/octet-stream");
-      }
-
-      if (contentLength) {
-        res.setHeader("Content-Length", contentLength);
-      }
-
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${data.title || "video"}-${quality}.mp4"`
-      );
-
-      res.setHeader("Cache-Control", "no-cache");
-
-      // =========================
-      // 7. STREAM FILE
-      // =========================
-      return fileRes.body.pipe(res);
-    }
-
-    // =========================
-    // 8. RETURN ALL LINKS (NO DOWNLOAD YET)
-    // =========================
-    res.json({
-      creator: "𝐃 𝐀 𝐑 𝐊  𝐂 𝐘 𝐁 𝐄 𝐑  𝐂𝐇𝐀𝐓𝐇𝐔𝐑𝐀 👨‍💻",
-      title: data.title,
-      description: data.description,
-      downloads: links,
-      usage: {
-        all: `/api/download?url=PAGE_URL`,
-        single: `/api/download?url=PAGE_URL&quality=720p`
-      }
-    });
-
+    scraped = await scraperRes.json();
   } catch (err) {
-    res.status(500).json({
-      error: "Server error",
-      details: err.message
+    return res.status(500).json({ error: "Failed to contact scraper", details: err.message });
+  }
+
+  // Step 2: Extract best link (manual preferred, fallback drive2)
+  const rawLink = scraped?.links?.manual || scraped?.links?.drive2;
+  if (!rawLink) {
+    return res.status(404).json({ error: "No download link found in scraper response", scraped });
+  }
+
+  // Step 3: Build base path (domain-replaced, quality stripped)
+  const basePath = getBasePath(rawLink);
+
+  // Step 4: Generate quality URLs using target domain
+  const baseUrl = req.headers["x-forwarded-host"]
+    ? `https://${req.headers["x-forwarded-host"]}`
+    : `https://karicine.vercel.app`;
+
+  const downloadLinks = {};
+  for (const [q, suffix] of Object.entries(QUALITY_MAP)) {
+    const directUrl = `${TARGET_DOMAIN}${basePath}-${suffix}`;
+    const proxyUrl = `${baseUrl}/api/download?quality=${q}&url=${encodeURIComponent(basePath + "-")}`;
+    downloadLinks[q] = {
+      direct: directUrl,
+      proxy: proxyUrl,
+    };
+  }
+
+  return res.status(200).json({
+    creator: CREATOR,
+    title: scraped.title || "Unknown",
+    description: scraped.description || "",
+    basePath,
+    downloads: downloadLinks,
+  });
+}
+
+// Stream file to user
+async function streamFile(videoUrl, fileName, res) {
+  try {
+    const response = await fetch(videoUrl, {
+      method: "GET",
+      headers: {
+        Referer: "https://cinesubz.lk/",
+        "User-Agent": "Mozilla/5.0",
+        Accept: "*/*",
+      },
     });
+
+    if (!response.ok) {
+      return res.status(502).json({ error: "Failed to fetch video", status: response.status, url: videoUrl });
+    }
+
+    const contentType = response.headers.get("content-type");
+    const contentLength = response.headers.get("content-length");
+
+    res.setHeader("Content-Type", contentType || "video/mp4");
+    if (contentLength) res.setHeader("Content-Length", contentLength);
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Cache-Control", "no-cache");
+
+    response.body.pipe(res);
+  } catch (err) {
+    res.status(500).json({ error: "Stream error", details: err.message });
   }
 }
