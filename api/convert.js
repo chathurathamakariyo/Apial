@@ -1,25 +1,9 @@
-import { saveLink } from "../lib/store.js";
-
-function generateId() {
-  return Math.random().toString(36).substring(2, 8);
-}
-
 export default function handler(req, res) {
   const { url } = req.query;
 
-  if (!url) {
-    return res.status(400).json({ error: "No URL provided" });
-  }
+  if (!url) return res.status(400).json({ error: "No URL" });
 
-  const id = generateId();
+  const short = `https://${req.headers.host}/api/download?url=${encodeURIComponent(url)}`;
 
-  saveLink(id, url);
-
-  const shortLink = `https://${req.headers.host}/api/d/${id}`;
-
-  res.json({
-    success: true,
-    id,
-    link: shortLink
-  });
+  res.json({ link: short });
 }
