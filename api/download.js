@@ -3,42 +3,27 @@ import fetch from "node-fetch";
 export default async function handler(req, res) {
   const { url } = req.query;
 
-  console.log("Incoming URL:", url); // 🔥 debug
+  if (!url) return res.status(400).send("No URL");
 
-  if (!url) {
-    return res.status(400).send("No URL provided");
-  }
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Referer": "https://cinesubz.lk/"
-      }
-    });
-
-    if (!response.ok) {
-      return res.status(500).send("Failed to fetch file");
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+      "Referer": "https://cinesubz.lk/"
     }
+  });
 
-    let rawName = decodeURIComponent(url.split("/").pop().split("?")[0]);
+  if (!response.ok) return res.status(500).send("Failed");
 
-    const fileName = `[Chdev]${rawName}`;
+  const total = Number(response.headers.get("content-length") || 0);
 
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${fileName}"`
-    );
+  let rawName = decodeURIComponent(url.split("/").pop().split("?")[0]);
+  const fileName = `[Chdev]${rawName}`;
 
-    res.setHeader(
-      "Content-Type",
-      response.headers.get("content-type") || "application/octet-stream"
-    );
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  res.setHeader("Content-Type", "application/octet-stream");
 
-    response.body.pipe(res);
+  // 🔥 send total size to frontend
+  res.setHeader("X-Total-Size", total);
 
-  } catch (err) {
-    console.log(err);
-    res.status(500).send("Server error");
-  }
+  response.body.pipe(res);
 }
