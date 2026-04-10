@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
   if (!response.ok) return res.status(500).send("Failed");
 
-  const total = Number(response.headers.get("content-length") || 0);
+  const total = response.headers.get("content-length");
 
   let rawName = decodeURIComponent(url.split("/").pop().split("?")[0]);
   const fileName = `[Chdev]${rawName}`;
@@ -22,8 +22,10 @@ export default async function handler(req, res) {
   res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
   res.setHeader("Content-Type", "application/octet-stream");
 
-  // 🔥 send total size to frontend
-  res.setHeader("X-Total-Size", total);
+  // 🔥 IMPORTANT: force expose header
+  res.setHeader("Access-Control-Expose-Headers", "X-Total-Size");
+
+  res.setHeader("X-Total-Size", total || 0);
 
   response.body.pipe(res);
 }
