@@ -24,22 +24,31 @@ export default async function handler(req, res) {
     }
 
     const newDomain = "https://06.sume321.online/";
+    const baseUrl = "https://karicine.vercel.app/api/download?url=";
 
     let fileName = manual.split("/").pop();
 
     const baseName = fileName.replace(/(360p|480p|720p|1080p)/, "QUALITY");
 
-    const links = {
+    // 🔥 ORIGINAL DIRECT LINKS
+    const directLinks = {
       "480p": newDomain + baseName.replace("QUALITY", "480p"),
       "720p": newDomain + baseName.replace("QUALITY", "720p"),
       "1080p": newDomain + baseName.replace("QUALITY", "1080p")
+    };
+
+    // 🔥 FINAL DOWNLOAD LINKS (ENCODED)
+    const downloads = {
+      "480p": baseUrl + encodeURIComponent(directLinks["480p"]),
+      "720p": baseUrl + encodeURIComponent(directLinks["720p"]),
+      "1080p": baseUrl + encodeURIComponent(directLinks["1080p"])
     };
 
     return res.status(200).json({
       status: true,
       creator: "Chathura",
       title: data.title,
-      links
+      downloads
     });
 
   } catch (err) {
