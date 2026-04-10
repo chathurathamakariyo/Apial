@@ -1,33 +1,7 @@
 {
   "version": 2,
-  "functions": {
-    "api/*.js": {
-      "maxDuration": 10
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/scrap",
-      "destination": "/api/scrap.js"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET,OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type"
-        }
-      ]
-    }
+  "routes": [
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/api/(.*)", "dest": "/api/$1" }
   ]
 }
