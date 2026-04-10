@@ -3,13 +3,14 @@ import fetch from "node-fetch";
 export default async function handler(req, res) {
   let { url } = req.query;
 
-  if (!url) {
-    return res.status(400).send("No URL provided");
-  }
+  if (!url) return res.status(400).send("No URL provided");
 
   try {
-    // 🔥 decode URL
-    url = decodeURIComponent(url);
+    // 🔥 SAFE double decode
+    try {
+      url = decodeURIComponent(url);
+      url = decodeURIComponent(url);
+    } catch {}
 
     const response = await fetch(url, {
       headers: {
@@ -24,26 +25,13 @@ export default async function handler(req, res) {
 
     const total = response.headers.get("content-length") || 0;
 
-    // 🔥 clean filename + [Chdev] prefix
-    let rawName = url.split("/").pop().split("?")[0];
-    rawName = decodeURIComponent(rawName).replace(/\s+/g, " ");
+    let rawName = decodeURIComponent(url.split("/").pop());
 
     const fileName = `[Chdev]${rawName}`;
 
-    // headers
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${fileName}"`
-    );
-
-    res.setHeader(
-      "Content-Type",
-      response.headers.get("content-type") || "application/octet-stream"
-    );
-
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     res.setHeader("X-Total-Size", total);
 
-    // stream
     response.body.pipe(res);
 
   } catch (err) {
