@@ -11,7 +11,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch(url);
+    // 🔥 USE YOUR NETLIFY SCRAPER
+    const api = `https://karicine.netlify.app/.netlify/functions/scrapper?url=${url}`;
+
+    const response = await fetch(api);
     const data = await response.json();
 
     const manual = data?.links?.manual;
@@ -30,14 +33,14 @@ export default async function handler(req, res) {
 
     const baseName = fileName.replace(/(360p|480p|720p|1080p)/, "QUALITY");
 
-    // 🔥 ORIGINAL DIRECT LINKS
+    // 🔥 DIRECT LINKS
     const directLinks = {
       "480p": newDomain + baseName.replace("QUALITY", "480p"),
       "720p": newDomain + baseName.replace("QUALITY", "720p"),
       "1080p": newDomain + baseName.replace("QUALITY", "1080p")
     };
 
-    // 🔥 FINAL DOWNLOAD LINKS (ENCODED)
+    // 🔥 DOWNLOAD LINKS
     const downloads = {
       "480p": baseUrl + encodeURIComponent(directLinks["480p"]),
       "720p": baseUrl + encodeURIComponent(directLinks["720p"]),
@@ -52,10 +55,11 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("ERROR:", err);
+
     return res.status(500).json({
       status: false,
-      message: "Server error"
+      message: "Server error (check logs)"
     });
   }
 }
