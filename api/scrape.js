@@ -1,48 +1,52 @@
 import fetch from "node-fetch";
 
-const SCRAPER_API = "https://karicine.netlify.app/.netlify/functions/scrapper";
-const SOURCE_DOMAIN = "https://csplayer2510.store/";
-const TARGET_DOMAIN = "https://06.sume321.online/";
-
 export default async function handler(req, res) {
   const { url } = req.query;
 
   if (!url) {
     return res.status(400).json({
-      error: "No URL provided",
-      usage: "/api/scrape?url=https://cinesubz.lk/movies/movie-name/",
+      status: false,
+      message: "No URL provided"
     });
   }
 
-  let scraped;
   try {
-    const r = await fetch(`${SCRAPER_API}?url=${encodeURIComponent(url)}`);
-    if (!r.ok) return res.status(502).json({ error: "Scraper API failed", status: r.status });
-    scraped = await r.json();
+    const response = await fetch(url);
+    const data = await response.json();
+
+    const manual = data?.links?.manual;
+
+    if (!manual) {
+      return res.status(500).json({
+        status: false,
+        message: "No manual link found"
+      });
+    }
+
+    const newDomain = "https://06.sume321.online/";
+
+    let fileName = manual.split("/").pop();
+
+    const baseName = fileName.replace(/(360p|480p|720p|1080p)/, "QUALITY");
+
+    const links = {
+      "480p": newDomain + baseName.replace("QUALITY", "480p"),
+      "720p": newDomain + baseName.replace("QUALITY", "720p"),
+      "1080p": newDomain + baseName.replace("QUALITY", "1080p")
+    };
+
+    return res.status(200).json({
+      status: true,
+      creator: "Chathura",
+      title: data.title,
+      links
+    });
+
   } catch (err) {
-    return res.status(500).json({ error: "Scraper request failed", details: err.message });
+    console.error(err);
+    return res.status(500).json({
+      status: false,
+      message: "Server error"
+    });
   }
-
-  const rawLink = scraped?.links?.manual || scraped?.links?.drive2;
-  if (!rawLink) return res.status(404).json({ error: "No download link found", scraped });
-
-  // Domain replace + strip quality suffix
-  const domainReplaced = rawLink.replace(SOURCE_DOMAIN, TARGET_DOMAIN);
-  const basePath = domainReplaced.replace(/-?(480p|720p|1080p?)\.mp4(\?.*)?$/i, "");
-
-  const host = `https://${req.headers["x-forwarded-host"] || req.headers.host}`;
-  const downloads = {};
-
-  for (const [q, suffix] of Object.entries({ "480p": "480p", "720p": "720p", "1080p": "1080p" })) {
-    const videoUrl = `${basePath}-${suffix}.mp4`;
-    downloads[q] = `${host}/api/download?url=${encodeURIComponent(videoUrl)}`;
-  }
-
-  return res.status(200).json({
-    creator: "Chathura Hansaka",
-    title: scraped.title || "Unknown",
-    source: rawLink,
-    basePath,
-    downloads,
-  });
 }
