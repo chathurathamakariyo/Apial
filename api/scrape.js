@@ -1,5 +1,8 @@
 import fetch from "node-fetch";
 
+// 🔥 Vercel safe fetch setup (fallback)
+globalThis.fetch = globalThis.fetch || fetch;
+
 export default async function handler(req, res) {
   const { url } = req.query;
 
@@ -11,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 🔥 USE YOUR NETLIFY SCRAPER
+    // 🔥 Netlify scraper call
     const api = `https://karicine.netlify.app/.netlify/functions/scrapper?url=${url}`;
 
     const response = await fetch(api);
@@ -26,25 +29,21 @@ export default async function handler(req, res) {
       });
     }
 
-    const newDomain = "https://06.sume321.online/";
-    const baseUrl = "https://karicine.vercel.app/api/download?url=";
+    const baseDownload = "https://karicine.vercel.app/api/download?url=";
 
     let fileName = manual.split("/").pop();
 
-    const baseName = fileName.replace(/(360p|480p|720p|1080p)/, "QUALITY");
-
-    // 🔥 DIRECT LINKS
-    const directLinks = {
-      "480p": newDomain + baseName.replace("QUALITY", "480p"),
-      "720p": newDomain + baseName.replace("QUALITY", "720p"),
-      "1080p": newDomain + baseName.replace("QUALITY", "1080p")
+    // quality placeholder system
+    const direct = {
+      "480p": manual.replace(/360p|720p|1080p/, "480p"),
+      "720p": manual.replace(/360p|480p|1080p/, "720p"),
+      "1080p": manual.replace(/360p|480p|720p/, "1080p")
     };
 
-    // 🔥 DOWNLOAD LINKS
     const downloads = {
-      "480p": baseUrl + encodeURIComponent(directLinks["480p"]),
-      "720p": baseUrl + encodeURIComponent(directLinks["720p"]),
-      "1080p": baseUrl + encodeURIComponent(directLinks["1080p"])
+      "480p": baseDownload + encodeURIComponent(direct["480p"]),
+      "720p": baseDownload + encodeURIComponent(direct["720p"]),
+      "1080p": baseDownload + encodeURIComponent(direct["1080p"])
     };
 
     return res.status(200).json({
@@ -55,11 +54,11 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error("ERROR:", err);
+    console.error("SCRAPE ERROR:", err);
 
     return res.status(500).json({
       status: false,
-      message: "Server error (check logs)"
+      message: "Server error"
     });
   }
 }
