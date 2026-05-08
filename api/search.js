@@ -28,6 +28,13 @@ async function search(query) {
           .find(".entry-summary, .post-excerpt, .excerpt, p")
           .first()
           .text()
+          .trim() || null,
+
+      category:
+        $(el)
+          .find(".cat-links a")
+          .first()
+          .text()
           .trim() || null
     });
   });
