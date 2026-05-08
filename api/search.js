@@ -22,15 +22,10 @@ async function search(query) {
     results.push({
       title: titleTag.text().trim(),
       url: titleTag.attr("href"),
+
       excerpt:
         $(el)
           .find(".entry-summary, .post-excerpt, .excerpt, p")
-          .first()
-          .text()
-          .trim() || null,
-      category:
-        $(el)
-          .find(".cat-links a")
           .first()
           .text()
           .trim() || null
