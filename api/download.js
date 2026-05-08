@@ -1,50 +1,63 @@
-import fetch from "node-fetch";
+const cheerio = require("cheerio");
+const fetchHTML = require("../lib/fetch");
 
-// fallback safe fetch
-globalThis.fetch = globalThis.fetch || fetch;
+const BASE = "https://www.alevelapi.com";
 
-export default async function handler(req, res) {
-  const { url } = req.query;
+async function getDownloads(url) {
+  const html = await fetchHTML(url);
 
-  if (!url) {
-    return res.status(400).send("No URL provided");
-  }
+  const $ = cheerio.load(html);
 
+  const title =
+    $("h1.entry-title").first().text().trim() ||
+    $("title").text().trim();
+
+  const downloads = [];
+
+  $("a[href]").each((_, el) => {
+    const href = $(el).attr("href");
+    const text = $(el).text().trim();
+
+    if (
+      text.toLowerCase().includes("download") ||
+      href.endsWith(".pdf")
+    ) {
+      downloads.push({
+        label: text,
+        href: href.startsWith("http")
+          ? href
+          : BASE + href
+      });
+    }
+  });
+
+  return {
+    title,
+    downloads
+  };
+}
+
+module.exports = async (req, res) => {
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Referer": "https://cinesubz.lk/"
-      }
-    });
+    const url = req.query.url;
 
-    if (!response.ok) {
-      return res.status(500).send("Failed to fetch file");
+    if (!url) {
+      return res.status(400).json({
+        status: false,
+        message: "Missing URL"
+      });
     }
 
-    // 🔥 filename extract
-    let fileName = decodeURIComponent(url.split("/").pop() || "video.mp4");
+    const data = await getDownloads(url);
 
-    // clean filename
-    fileName = fileName
-      .replace(/\s+/g, "")
-      .replace(/\[/g, "")
-      .replace(/\]/g, "")
-      .replace(/[^a-zA-Z0-9()._-]/g, "");
-
-    // prefix
-    fileName = `[Chdev]${fileName}`;
-
-    // headers
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-    res.setHeader("Content-Type", "video/mp4");
-    res.setHeader("Accept-Ranges", "bytes");
-
-    // stream
-    response.body.pipe(res);
-
+    res.json({
+      status: true,
+      result: data
+    });
   } catch (err) {
-    console.error("DOWNLOAD ERROR:", err);
-    res.status(500).send("Server error");
+    res.status(500).json({
+      status: false,
+      error: err.message
+    });
   }
-}
+};
