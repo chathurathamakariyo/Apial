@@ -1,12 +1,12 @@
 require("dotenv").config();
 
 const express = require("express");
-
 const search = require("./api/search");
-const downloads = require("./api/downloads");
+const downloads = require("./api/download");
 
 const app = express();
 
+// health check
 app.get("/", (req, res) => {
   res.json({
     status: true,
@@ -14,7 +14,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// search endpoint
+// SEARCH API
 app.get("/search", async (req, res) => {
   try {
     const q = req.query.q;
@@ -26,12 +26,12 @@ app.get("/search", async (req, res) => {
       });
     }
 
-    const results = await search(q);
+    const result = await search(q);
 
     res.json({
       status: true,
-      total: results.length,
-      results
+      total: result.length,
+      results: result
     });
   } catch (err) {
     res.status(500).json({
@@ -41,7 +41,7 @@ app.get("/search", async (req, res) => {
   }
 });
 
-// downloads endpoint
+// DOWNLOAD API
 app.get("/downloads", async (req, res) => {
   try {
     const url = req.query.url;
@@ -67,8 +67,9 @@ app.get("/downloads", async (req, res) => {
   }
 });
 
+// START SERVER
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log("Server running on", PORT);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("🚀 Server running on port", PORT);
 });
