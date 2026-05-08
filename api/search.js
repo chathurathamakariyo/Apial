@@ -42,28 +42,4 @@ async function search(query) {
   return results;
 }
 
-module.exports = async (req, res) => {
-  try {
-    const q = req.query.q;
-
-    if (!q) {
-      return res.status(400).json({
-        status: false,
-        message: "Missing query"
-      });
-    }
-
-    const results = await search(q);
-
-    res.json({
-      status: true,
-      total: results.length,
-      results
-    });
-  } catch (err) {
-    res.status(500).json({
-      status: false,
-      error: err.message
-    });
-  }
-};
+module.exports = search;
