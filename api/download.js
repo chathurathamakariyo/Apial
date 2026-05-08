@@ -38,27 +38,4 @@ async function downloads(url) {
   };
 }
 
-module.exports = async (req, res) => {
-  try {
-    const url = req.query.url;
-
-    if (!url) {
-      return res.status(400).json({
-        status: false,
-        message: "Missing url"
-      });
-    }
-
-    const result = await downloads(url);
-
-    res.json({
-      status: true,
-      result
-    });
-  } catch (err) {
-    res.status(500).json({
-      status: false,
-      error: err.message
-    });
-  }
-};
+module.exports = downloads;
