@@ -20,7 +20,8 @@ async function downloads(url) {
 
     if (
       href.endsWith(".pdf") ||
-      text.toLowerCase().includes("download")
+      text.toLowerCase().includes("download") ||
+      text.toLowerCase().includes("view online")
     ) {
       data.push({
         label: text,
