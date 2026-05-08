@@ -1,8 +1,14 @@
 {
-  "name": "stream-downloader",
+  "name": "alevel-api",
   "version": "1.0.0",
-  "type": "module",
+  "description": "AlevelAPI Scraper with Free Proxy Rotation",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev"
+  },
   "dependencies": {
-    "node-fetch": "^3.3.2"
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0",
+    "https-proxy-agent": "^7.0.5"
   }
 }
