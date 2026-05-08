@@ -3,29 +3,29 @@ const fetchHTML = require("../lib/fetch");
 
 const BASE = "https://www.alevelapi.com";
 
-async function downloads(url) {
+module.exports = async function downloads(url) {
   const html = await fetchHTML(url);
 
   const $ = cheerio.load(html);
 
   const title =
-    $("h1.entry-title").first().text().trim() ||
+    $("h1").first().text().trim() ||
     $("title").text().trim();
 
-  const data = [];
+  const downloads = [];
 
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href");
     const text = $(el).text().trim();
 
     if (
-      href.endsWith(".pdf") ||
-      text.toLowerCase().includes("download") ||
-      text.toLowerCase().includes("view online")
+      href &&
+      (href.endsWith(".pdf") ||
+        text.toLowerCase().includes("download"))
     ) {
-      data.push({
+      downloads.push({
         label: text,
-        href: href.startsWith("http")
+        url: href.startsWith("http")
           ? href
           : BASE + href
       });
@@ -34,8 +34,6 @@ async function downloads(url) {
 
   return {
     title,
-    downloads: data
+    downloads
   };
-}
-
-module.exports = downloads;
+};
